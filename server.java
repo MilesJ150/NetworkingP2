@@ -1,7 +1,10 @@
 import java.io.*;
 import java.net.*;
+import java.util.Collections;
 import java.util.Random;
 import java.util.Scanner;
+
+import static com.sun.org.apache.xml.internal.security.keys.keyresolver.KeyResolver.length;
 
 public class server {
 
@@ -65,19 +68,20 @@ class clientThread extends Thread {
     @Override
     // game logic
     public void run() {
-        //String received;
-        String toreturn;
-
         String[] dictionary = {"sparrow", "gopher", "lion", "ant", "aardvark", "zebra", "wolf", "hyena", "bee",
                 "whale", "bass", "corgi", "tiger", "shark", "dog"};
 
         //word to guess
         String word = "";
+        //_ guess string
         String guess = "";
+        //letter guessed by client
+        String letter = "";
         int wrongNum = 0;
 
         byte[] received = new byte[2];
         boolean end = false;
+        boolean badGuess;
         boolean gameStart = false;
 
         while (!end) {
@@ -102,23 +106,65 @@ class clientThread extends Thread {
                         word = dictionary[rand];
 
                         //set guess
-                        guess = new String(new char[word.length()]).replace("\0", "_ ");
+                        guess = String.join("", Collections.nCopies(word.length(), "_ "));
 
                         //ask for first guess
                         output.write(packet_translate_guess(word, wrongNum, guess));
                     }
+
                 } else {
-                    // begin game
-                    System.out.println("Game Start!");
+                    if (received[0] == (byte) 1) {
+                        //read guess
+                        char[] c = guess.toCharArray();
 
+                        badGuess = true;
+                        letter = Character.toString((char) received[1]);
+                        for (int x = 0; x < word.length(); x++) {
+                            if (letter.equals(Character.toString(word.charAt(x)))) {
+                                c[2 * x] = letter.charAt(0);
+                                badGuess = false;
+                            }
+                        }
+                        guess = String.valueOf(c);
 
-                    end = true;
+                        if (guess.replaceAll(" ", "").equals(word)) {
+                            output.write(packet_translate_message("You Win!"));
+                            output.write(packet_translate_guess(word, wrongNum, guess));
+                            end = true;
+                            break;
+                        }
+
+                        if (badGuess) {
+                            wrongNum++;
+                        }
+
+                        if (wrongNum > 5) {
+                            output.write(packet_translate_message("Game Over!"));
+                            output.write(packet_translate_guess(word, wrongNum, guess));
+                            end = true;
+                            break;
+                        }
+                        //ask for next guess
+                        output.write(packet_translate_guess(word, wrongNum, guess));
+
+                    } else {
+                        System.out.println("Bad packet from client");
+                    }
                 }
 
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+
+        //close game after client finishes
+        System.out.println("A client has finished their game and closed their connection.");
+        try {
+            this.client_socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         try {
             // closing resources
             this.input.close();
@@ -136,6 +182,15 @@ class clientThread extends Thread {
         packet[2] = (byte) wrongNum;
         for (int x = 3; x <= guess.length() + 2; x++) {
             packet[x] = (byte) (guess.charAt(x - 3) & 0x00FF);
+        }
+        return packet;
+    }
+
+    public byte[] packet_translate_message(String m) {
+        byte[] packet = new byte[256];
+        packet[0] = (byte) m.length();
+        for (int x = 1; x <= m.length(); x++) {
+            packet[x] = (byte) (m.charAt(x - 1) & 0x00FF);
         }
         return packet;
     }

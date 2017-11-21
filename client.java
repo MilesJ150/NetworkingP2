@@ -12,16 +12,28 @@ public class client {
             String server_IP = args[0];
             int server_port = Integer.parseInt(args[1]);
 
-            //establish connecction
+            //establish connection
             Socket client_socket = new Socket(server_IP, server_port);
 
 	        //obtain input and output streams
             DataInputStream input = new DataInputStream(client_socket.getInputStream());
             DataOutputStream output = new DataOutputStream(client_socket.getOutputStream());
 
-            String from_user;
-            //String from_server;
+            String from_user = "";
+            //Guess string from server
+            String guess;
+            //Message from server
+            String message;
+            //previous iteration of guess for incorrect guess check
+            String guessString = "";
+            //array of client guesses
+            String[] guessed = new String[27];
+            int guessNum = 0;
+
+
             byte[] received = new byte[256];
+            //string of incorrect guesses
+            String incorrectGuess = "";
 
             boolean gameStart = false;
             boolean end = false;
@@ -34,7 +46,7 @@ public class client {
                     from_user = scanner.nextLine();
 
                     //if the user types n close the connection
-                    if (from_user.equals("n")) {
+                    if (from_user.toLowerCase().equals("n")) {
                         //format output
                         output.write(packet_translate('n'));
 
@@ -44,37 +56,78 @@ public class client {
                     }
 
                     //send the start message as specified in document
-                    output.write(packet_translate('0'));
+                    if (from_user.toLowerCase().equals("y")) {
+                        output.write(packet_translate('0'));
 
-                    //game start
-                    gameStart = true;
+                        //game start
+                        gameStart = true;
+                    } else {
+                        System.out.println("Bad input!");
+                    }
                 }
 
                 input.read(received);
 
                 if (received[0] == (byte) 0) {
-                    String guess = "";
-                    for (int x = 0; x < (int) received[1]; x++) {
+                    guess = "";
+                    for (int x = 0; x < (int) received[1] * 2; x++) {
                         guess += (char) received[x + 3];
                     }
 
-                    //TODO: Incorrect guesses
-                    System.out.printf("\n%s\nIncorrect guesses: \n", guess);
+                    //incorrect guess occurred from last picked letter
+                    if (guessString.equals(guess)) {
+                        incorrectGuess += from_user + " ";
+                    }
+
+                    //set guessString to updated guess
+                    guessString = guess;
+
+                    System.out.printf("\n%s\nIncorrect guesses: %s\n", guess, incorrectGuess);
                     System.out.println("Guess a letter: ");
 
                     from_user = "";
-                    if (from_user.equals("")) {
+                    while (from_user.equals("")) {
                         from_user = scanner.nextLine();
 
                         if (from_user.length() != 1 || !Character.isLetter(from_user.charAt(0))) {
                             System.out.println("Bad entry, guess a letter: ");
                             from_user = "";
                         }
-                    }
 
-                //TODO OR MESSAGE FROM SERVER
+                        for (int x = 0; x < guessNum; x++) {
+                            if (from_user.toLowerCase().equals(guessed[x])) {
+                                System.out.println("Duplicate guess, guess another letter: ");
+                                from_user = "";
+                            }
+                        }
+                    }
+                    guessed[guessNum] = from_user;
+                    guessNum++;
+
+                    output.write(packet_translate(from_user.charAt(0)));
+
                 } else {
-                    System.out.println("Error in game flow");
+                    //got a message from server
+                    message = "";
+                    for (int x = 1; x < (int) (received[0]) + 1; x++) {
+                        message += Character.toString((char) received[x]);
+                    }
+                    input.read(received);
+                    if (received[0] == (byte) 0) {
+                        guess = "";
+                        for (int x = 0; x < (int) received[1] * 2; x++) {
+                            guess += (char) received[x + 3];
+                        }
+
+                        if (guessString.equals(guess)) {
+                            incorrectGuess += from_user + " ";
+                        }
+                        guessString = guess;
+
+                        System.out.printf("\n%s\nIncorrect guesses: %s\n", guess, incorrectGuess);
+                    }
+                    System.out.println(message);
+                    end = true;
                 }
             }
 
