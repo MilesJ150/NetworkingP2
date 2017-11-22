@@ -11,13 +11,32 @@ public class server {
     private static final int max_clients = 3;
     private static final clientThread[] threads = new clientThread[max_clients];
 
+    private static String[] words;
+
     //ServerSocket server_socket;
     //Socket client_socket;
 
     public static void main(String args[]) throws IOException {
 	    int port_number = Integer.parseInt(args[0]);
-        
 
+        if (args.length > 1) {
+            BufferedReader reader = new BufferedReader(new FileReader(args[1]));
+            String line;
+
+            try {
+                //parse header line
+                int counter = 0;
+                line = reader.readLine();
+                String[] s = line.split(" ");
+                words = new String[Integer.parseInt(s[1])];
+                while((line = reader.readLine()) != null) {
+                    words[counter] = line;
+                    counter++;
+                }
+            } finally {
+                reader.close();
+            }
+        }
         //open a server socket on port_number
         ServerSocket server_socket = new ServerSocket(port_number);
 
@@ -36,7 +55,12 @@ public class server {
 			    System.out.println("Assigning new thread for this client");
 
 			    //create new thread
-			    Thread thread = new clientThread(client_socket, input, output);
+                Thread thread;
+                if (words != null) {
+                    thread = new clientThread(client_socket, input, output, words);
+                } else {
+                    thread = new clientThread(client_socket, input, output);
+                }
 			    thread.start();
 		    } catch (Exception e) {
 			    client_socket.close();
@@ -54,6 +78,8 @@ class clientThread extends Thread {
     private final clientThread[] threads;
     private int max_clients;
 
+    public String[] words;
+
     //constructor
     public clientThread(Socket client_socket, DataInputStream dis, DataOutputStream dos) {
         this.client_socket = client_socket;
@@ -65,12 +91,29 @@ class clientThread extends Thread {
         //max_clients = threads.length;
     }
 
+    public clientThread(Socket client_socket, DataInputStream dis, DataOutputStream dos, String[] dictionary) {
+        this.client_socket = client_socket;
+        this.input = dis;
+        this.output = dos;
+        this.threads = null;
+        this.max_clients = 0;
+        this.words = dictionary;
+        //this.threads = threads;
+        //max_clients = threads.length;
+    }
+
+
     @Override
     // game logic
     public void run() {
-        String[] dictionary = {"sparrow", "gopher", "lion", "ant", "aardvark", "zebra", "wolf", "hyena", "bee",
-                "whale", "bass", "corgi", "tiger", "shark", "dog"};
-
+        String[] dictionary;
+        if (words == null) {
+            String[] d = {"sparrow", "gopher", "lion", "ant", "aardvark", "zebra", "wolf", "hyena", "bee",
+                    "whale", "bass", "corgi", "tiger", "shark", "dog"};
+            dictionary = d;
+        } else {
+            dictionary = words;
+        }
         //word to guess
         String word = "";
         //_ guess string
