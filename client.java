@@ -6,6 +6,7 @@ public class client {
 
     public static void main(String args[]) throws UnknownHostException, IOException {
         try {
+            boolean server_busy = false;
             Scanner scanner = new Scanner(System.in);
 
             //get serverIP and serverPort from input args
@@ -68,6 +69,7 @@ public class client {
 
                 input.read(received);
 
+                //got a game control packet from server
                 if (received[0] == (byte) 0) {
                     guess = "";
                     for (int x = 0; x < (int) received[1] * 2; x++) {
@@ -106,12 +108,21 @@ public class client {
 
                     output.write(packet_translate(from_user.charAt(0)));
 
+                //got a message from server                
                 } else {
-                    //got a message from server
+                    //extract message from packet
                     message = "";
                     for (int x = 1; x < (int) (received[0]) + 1; x++) {
                         message += Character.toString((char) received[x]);
                     }
+    
+                    //check if server response is "server busy"
+                    if (message.equals("Server- overloaded")) {
+                        System.out.println(message);
+                        client_socket.close();
+                        break;
+                    }
+
                     input.read(received);
                     if (received[0] == (byte) 0) {
                         guess = "";

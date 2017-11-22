@@ -4,17 +4,16 @@ import java.util.Collections;
 import java.util.Random;
 import java.util.Scanner;
 
-import static com.sun.org.apache.xml.internal.security.keys.keyresolver.KeyResolver.length;
+//import static com.sun.org.apache.xml.internal.security.keys.keyresolver.KeyResolver.length;
 
 public class server {
 
-    private static final int max_clients = 3;
+    public static final int max_clients = 3;
     private static final clientThread[] threads = new clientThread[max_clients];
 
     private static String[] words;
 
-    //ServerSocket server_socket;
-    //Socket client_socket;
+    public static int num_clients = 0;
 
     public static void main(String args[]) throws IOException {
 	    int port_number = Integer.parseInt(args[0]);
@@ -53,12 +52,17 @@ public class server {
 			    DataOutputStream output = new DataOutputStream(client_socket.getOutputStream());
 
 			    System.out.println("Assigning new thread for this client");
+                System.out.println();
 
 			    //create new thread
                 Thread thread;
+
+                //increment the number of clients
+                ++num_clients;
+                
                 if (words != null) {
                     thread = new clientThread(client_socket, input, output, words);
-                } else {
+                } else { 
                     thread = new clientThread(client_socket, input, output);
                 }
 			    thread.start();
@@ -75,9 +79,6 @@ class clientThread extends Thread {
     final DataOutputStream output;
     final Socket client_socket;
 
-    private final clientThread[] threads;
-    private int max_clients;
-
     public String[] words;
 
     //constructor
@@ -85,21 +86,14 @@ class clientThread extends Thread {
         this.client_socket = client_socket;
         this.input = dis;
         this.output = dos;
-        this.threads = null;
-        this.max_clients = 0;
-        //this.threads = threads;
-        //max_clients = threads.length;
     }
 
     public clientThread(Socket client_socket, DataInputStream dis, DataOutputStream dos, String[] dictionary) {
         this.client_socket = client_socket;
         this.input = dis;
         this.output = dos;
-        this.threads = null;
-        this.max_clients = 0;
         this.words = dictionary;
-        //this.threads = threads;
-        //max_clients = threads.length;
+
     }
 
 
@@ -108,8 +102,7 @@ class clientThread extends Thread {
     public void run() {
         String[] dictionary;
         if (words == null) {
-            String[] d = {"sparrow", "gopher", "lion", "ant", "aardvark", "zebra", "wolf", "hyena", "bee",
-                    "whale", "bass", "corgi", "tiger", "shark", "dog"};
+            String[] d = {"sparrow", "gopher", "lion", "ant", "aardvark", "zebra", "wolf", "hyena", "bee", "whale", "bass", "corgi", "tiger", "shark", "dog"};
             dictionary = d;
         } else {
             dictionary = words;
@@ -134,7 +127,20 @@ class clientThread extends Thread {
 
                 if (!gameStart) {
                     if ((char) received[1] == ('n')) {
-                        System.out.println("A client has closed their connection.");
+                        --server.num_clients;
+                        System.out.println("A client has chosen not to play.");
+                        System.out.println();
+                        this.client_socket.close();
+                        break;
+                    }
+
+                    //if there are already the max number of clients 
+                    //send "server busy" message then close the socket
+                    if (server.num_clients > server.max_clients) {
+                        output.write(packet_translate_message("Server- overloaded"));
+                        --server.num_clients;
+                        System.out.println("Server- overloaded. Closing client connection.");
+                        System.out.println();
                         this.client_socket.close();
                         break;
                     }
@@ -203,6 +209,7 @@ class clientThread extends Thread {
         //close game after client finishes
         System.out.println("A client has finished their game and closed their connection.");
         try {
+            --server.num_clients;
             this.client_socket.close();
         } catch (IOException e) {
             e.printStackTrace();
